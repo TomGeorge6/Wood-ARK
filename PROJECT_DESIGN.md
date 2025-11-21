@@ -136,33 +136,42 @@
 
 ### 3.3 数据源
 
-#### 主数据源：ARK Invest 官网
+#### 主数据源：GitHub 镜像仓库
 
-我们使用两个开源项目作为数据采集的基础：
+ARK 官网存在反爬虫保护，经测试会返回 403/404 错误。因此使用 GitHub 开源镜像作为主数据源：
 
-**1. import-pandas/ark_invest** (实时数据采集)
-- **仓库**: https://github.com/import-pandas/ark_invest
-- **用途**: 实时下载 ARK 最新持仓 CSV
-- **优势**: 纯 Python、简单易用
-- **使用**: 集成其数据下载逻辑
-
-**2. thisjustinh/ark-invest-history** (历史数据)
+**thisjustinh/ark-invest-history** (每日自动同步 ARK 数据)
 - **仓库**: https://github.com/thisjustinh/ark-invest-history
-- **用途**: 提供 2021 年至今的完整历史数据
-- **优势**: 数据完整、包含交易记录和价格历史
-- **使用**: 用于首次初始化和历史回溯
+- **用途**: 主数据源，提供所有 ARK ETF 持仓数据
+- **优势**: 稳定可靠，无反爬虫限制，数据完整
+- **数据特点**: 包含完整历史数据，需自动筛选最新日期
 
-#### ARK 官方 CSV 地址
+#### 数据获取逻辑
 
 ```python
-ARK_CSV_URLS = {
-    'ARKK': 'https://ark-funds.com/wp-content/fundsiteliterature/csv/ARK_INNOVATION_ETF_ARKK_HOLDINGS.csv',
-    'ARKW': 'https://ark-funds.com/wp-content/fundsiteliterature/csv/ARK_NEXT_GENERATION_INTERNET_ETF_ARKW_HOLDINGS.csv',
-    'ARKG': 'https://ark-funds.com/wp-content/fundsiteliterature/csv/ARK_GENOMIC_REVOLUTION_MULTISECTOR_ETF_ARKG_HOLDINGS.csv',
-    'ARKQ': 'https://ark-funds.com/wp-content/fundsiteliterature/csv/ARK_AUTONOMOUS_TECHNOLOGY_&_ROBOTICS_ETF_ARKQ_HOLDINGS.csv',
-    'ARKF': 'https://ark-funds.com/wp-content/fundsiteliterature/csv/ARK_FINTECH_INNOVATION_ETF_ARKF_HOLDINGS.csv',
-}
+# GitHub 数据源 URL（简化文件名格式）
+GITHUB_URL_TEMPLATE = "https://raw.githubusercontent.com/thisjustinh/ark-invest-history/master/fund-holdings/{etf_symbol}.csv"
+
+# 关键实现：自动筛选最新日期数据
+if 'date' in df.columns:
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    max_date = df['date'].max()
+    df = df[df['date'] == max_date].copy()  # 仅保留最新日期
 ```
+
+#### 备用数据源（暂不实现）
+
+ARK 官网可作为后续优化的备用数据源，实现双源自动切换：
+
+```python
+# ARK 官网 CSV 地址（存在反爬虫问题）
+ARK_URL_TEMPLATE = "https://ark-funds.com/wp-content/fundsiteliterature/csv/{full_name}.csv"
+```
+
+**后续优化方向**：
+1. 实现双数据源自动切换（GitHub 主源 + ARK 官网备源）
+2. 添加数据源健康检查机制
+3. 配置化数据源优先级
 
 ---
 

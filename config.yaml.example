@@ -1,0 +1,32 @@
+# ARK 持仓监控系统配置文件
+
+# 定时任务配置
+schedule:
+  enabled: true                # 是否启用定时检查
+  cron_time: "11:00"           # 执行时间（北京时间）
+  timezone: "Asia/Shanghai"    # 时区
+
+# 数据配置
+data:
+  etfs: ["ARKK", "ARKW", "ARKG", "ARKQ", "ARKF"]  # 监控的 ETF 列表
+  data_dir: "./data"           # 数据存储目录
+  log_dir: "./logs"            # 日志存储目录
+
+# 分析配置
+analysis:
+  change_threshold: 5.0        # 显著变化阈值（百分比）
+
+# 通知配置
+notification:
+  webhook_url: "${WECHAT_WEBHOOK_URL}"  # 引用 .env 中的环境变量
+  enable_error_alert: true     # 是否发送错误告警
+
+# 重试配置
+retry:
+  max_retries: 3               # 最大重试次数
+  retry_delays: [1, 2, 4]      # 重试延迟（秒，指数退避）
+
+# 日志配置
+log:
+  retention_days: 30           # 日志保留天数
+  level: "INFO"                # 日志级别（DEBUG/INFO/WARNING/ERROR）

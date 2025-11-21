@@ -1,0 +1,390 @@
+---
+description: 
+alwaysApply: true
+enabled: true
+updatedAt: 2025-11-13T07:42:49.371Z
+provider: 
+---
+
+# Wood-ARK 项目约束规则
+
+本规则定义了 Wood-ARK 项目的特定技术约束和架构要求，与用户级通用编码规范互补。
+
+## 1. 技术栈约束
+
+### 1.1 必须使用
+- **Python 版本**: 3.9+
+- **核心依赖**:
+  - `pandas`: 数据处理
+  - `requests`: HTTP 请求
+  - `python-dotenv`: 环境变量管理
+
+### 1.2 禁止使用
+- ❌ 异步框架 (asyncio, aiohttp)
+- ❌ ORM 框架 (SQLAlchemy, Django ORM)
+- ❌ Web 框架 (Flask, FastAPI, Django)
+- ❌ 数据库系统 (MySQL, PostgreSQL, MongoDB)
+
+### 1.3 理由
+项目定位为**轻量级本地工具**，所有逻辑使用同步代码，数据存储使用 CSV 文件系统。
+
+## 2. 架构约束
+
+### 2.1 固定模块结构
+项目必须严格遵循以下 5 个核心模块：
+
+```
+src/
+├── fetcher.py          # DataFetcher: 数据获取
+├── analyzer.py         # Analyzer: 持仓变化分析
+├── reporter.py         # ReportGenerator: Markdown 报告生成
+├── notifier.py         # WeChatNotifier: 企业微信通知
+└── scheduler.py        # Scheduler: 调度逻辑
+```
+
+**禁止**:
+- ❌ 添加其他业务模块
+- ❌ 拆分现有模块为子模块
+- ❌ 合并多个模块
+
+### 2.2 模块职责
+
+#### DataFetcher
+```python
+class DataFetcher:
+    def fetch_holdings(self, etf_symbol: str, date: str) -> pd.DataFrame:
+        """获取指定日期的持仓数据"""
+        pass
+    
+    def save_to_csv(self, df: pd.DataFrame, etf_symbol: str, date: str) -> None:
+        """保存数据到 CSV 文件"""
+        pass
+```
+
+#### Analyzer
+```python
+class Analyzer:
+    def compare_holdings(self, 
+                        current: pd.DataFrame, 
+                        previous: pd.DataFrame,
+                        threshold: float = 0.05) -> dict:
+        """对比两个日期的持仓变化"""
+        pass
+```
+
+#### ReportGenerator
+```python
+class ReportGenerator:
+    def generate_markdown(self, analysis_result: dict, etf_symbol: str) -> str:
+        """生成 Markdown 格式报告"""
+        pass
+    
+    def save_report(self, content: str, etf_symbol: str, date: str) -> None:
+        """保存报告到文件"""
+        pass
+```
+
+#### WeChatNotifier
+```python
+class WeChatNotifier:
+    def send_markdown(self, content: str) -> bool:
+        """发送 Markdown 消息到企业微信"""
+        pass
+```
+
+#### Scheduler
+```python
+class Scheduler:
+    def should_run_today(self) -> bool:
+        """判断今天是否需要运行（周一到周五）"""
+        pass
+    
+    def get_previous_trading_day(self, current_date: str) -> str:
+        """获取上一个交易日"""
+        pass
+```
+
+## 3. 执行模式约束
+
+### 3.1 命令行参数
+项目必须支持以下执行模式：
+
+```bash
+# 1. 自动模式（默认）- 周一到周五自动运行
+python main.py
+
+# 2. 手动模式 - 强制执行（忽略工作日检查）
+python main.py --manual
+
+# 3. 指定日期模式
+python main.py --date 2025-01-15
+
+# 4. 检查缺失日期模式
+python main.py --check-missed
+
+# 5. 测试 Webhook 模式
+python main.py --test-webhook
+```
+
+### 3.2 主程序结构
+```python
+# main.py
+import argparse
+from src.scheduler import Scheduler
+from src.fetcher import DataFetcher
+from src.analyzer import Analyzer
+from src.reporter import ReportGenerator
+from src.notifier import WeChatNotifier
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--manual', action='store_true')
+    parser.add_argument('--date', type=str)
+    parser.add_argument('--check-missed', action='store_true')
+    parser.add_argument('--test-webhook', action='store_true')
+    args = parser.parse_args()
+    
+    # 调度逻辑
+    scheduler = Scheduler()
+    
+    if args.test_webhook:
+        # 测试 Webhook 连接
+        pass
+    elif args.check_missed:
+        # 检查并补充缺失数据
+        pass
+    else:
+        # 正常数据获取和分析流程
+        pass
+
+if __name__ == '__main__':
+    main()
+```
+
+## 4. 数据管理约束
+
+### 4.1 文件系统结构
+```
+data/
+├── holdings/
+│   ├── ARKK/
+│   │   ├── 2025-01-10.csv
+│   │   ├── 2025-01-11.csv
+│   │   └── ...
+│   ├── ARKW/
+│   └── ARKG/
+└── reports/
+    ├── ARKK/
+    │   ├── 2025-01-10.md
+    │   └── ...
+    └── ARKW/
+```
+
+### 4.2 CSV 格式要求
+```csv
+company,ticker,cusip,shares,market_value,weight
+Tesla Inc,TSLA,88160R101,1234567,280500000,10.50
+```
+
+**必须包含字段**:
+- `company`: 公司名称
+- `ticker`: 股票代码
+- `shares`: 持股数量
+- `market_value`: 市值
+- `weight`: 权重百分比
+
+### 4.3 文件命名规范
+- 持仓数据: `{ETF}/{YYYY-MM-DD}.csv`
+- 报告文件: `{ETF}/{YYYY-MM-DD}.md`
+
+## 5. 报告格式约束
+
+### 5.1 Markdown 结构
+报告必须严格遵循以下格式：
+
+```markdown
+# {ETF_SYMBOL} 持仓变化 ({YYYY-MM-DD})
+
+## 📊 概览
+- 对比日期: {previous_date} → {current_date}
+- 新增持仓: {count} 只
+- 移除持仓: {count} 只
+- 增持: {count} 只
+- 减持: {count} 只
+
+## ✅ 新增持仓
+| 股票代码 | 公司名称 | 持股数 | 市值 | 权重 |
+|---------|---------|--------|------|------|
+| TSLA    | Tesla Inc | 1.2M | $280M | 10.5% |
+
+## ❌ 移除持仓
+...
+
+## 📈 显著增持 (>{threshold}%)
+...
+
+## 📉 显著减持 (>{threshold}%)
+...
+
+## 📋 完整持仓
+...
+```
+
+### 5.2 Emoji 使用规范
+- ✅ 新增持仓
+- ❌ 移除持仓
+- 📈 增持
+- 📉 减持
+- 📊 概览
+- 📋 完整列表
+
+### 5.3 数值格式
+- 持股数: `1.2M` (百万), `345K` (千)
+- 市值: `$280M`, `$12.5B`
+- 权重: `10.5%` (保留1位小数)
+- 变化百分比: `+15.2%`, `-8.3%`
+
+## 6. 配置管理约束
+
+### 6.1 环境变量 (.env)
+```bash
+# 必需配置
+WECHAT_WEBHOOK_URL=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
+
+# 可选配置
+CHANGE_THRESHOLD=0.05          # 显著变化阈值（默认5%）
+ETF_SYMBOLS=ARKK,ARKW,ARKG     # 监控的 ETF 列表
+DATA_DIR=./data                # 数据目录
+RETRY_TIMES=3                  # 重试次数
+RETRY_DELAY=5                  # 重试延迟（秒）
+```
+
+### 6.2 配置加载
+```python
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# 必须检查必需配置
+WEBHOOK_URL = os.getenv('WECHAT_WEBHOOK_URL')
+if not WEBHOOK_URL:
+    raise ValueError("未配置 WECHAT_WEBHOOK_URL 环境变量")
+
+# 可选配置提供默认值
+CHANGE_THRESHOLD = float(os.getenv('CHANGE_THRESHOLD', '0.05'))
+ETF_SYMBOLS = os.getenv('ETF_SYMBOLS', 'ARKK,ARKW,ARKG').split(',')
+```
+
+## 7. 错误处理约束
+
+### 7.1 必须处理的异常
+```python
+# 网络请求失败
+try:
+    response = requests.get(url)
+    response.raise_for_status()
+except requests.RequestException as e:
+    logger.error(f"数据获取失败: {e}")
+    # 重试逻辑或失败通知
+
+# 文件操作失败
+try:
+    df.to_csv(file_path)
+except IOError as e:
+    logger.error(f"文件保存失败: {e}")
+
+# 数据解析失败
+try:
+    df = pd.read_csv(file_path)
+except pd.errors.ParserError as e:
+    logger.error(f"CSV 解析失败: {e}")
+```
+
+### 7.2 日志规范
+```python
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('logs/wood_ark.log'),
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
+```
+
+## 8. 测试约束
+
+### 8.1 必须测试的场景
+- ✅ 数据获取成功/失败
+- ✅ CSV 文件读写
+- ✅ 持仓变化分析逻辑
+- ✅ Markdown 报告生成
+- ✅ Webhook 发送（使用 mock）
+
+### 8.2 测试文件结构
+```
+tests/
+├── test_fetcher.py
+├── test_analyzer.py
+├── test_reporter.py
+├── test_notifier.py
+└── fixtures/
+    ├── sample_holdings.csv
+    └── expected_report.md
+```
+
+## 9. Webhook 推送约束
+
+### 9.1 消息格式
+```python
+{
+    "msgtype": "markdown",
+    "markdown": {
+        "content": "# ARKK 持仓变化\n..."
+    }
+}
+```
+
+### 9.2 失败处理
+- 3次重试机制
+- 每次重试间隔 5 秒
+- 失败后记录日志，不中断程序
+
+### 9.3 测试模式
+```python
+def test_webhook_connection():
+    """测试 Webhook 连接是否正常"""
+    test_message = {
+        "msgtype": "text",
+        "text": {"content": "Wood-ARK 测试消息"}
+    }
+    response = requests.post(WEBHOOK_URL, json=test_message)
+    return response.status_code == 200
+```
+
+## 10. 开发工作流约束
+
+### 10.1 新功能开发流程
+1. 更新 `PROJECT_DESIGN.md` 设计文档
+2. 在对应模块添加功能代码
+3. 编写单元测试
+4. 更新 `README.md`（如涉及用户使用）
+5. 提交 commit（遵循 Conventional Commits）
+
+### 10.2 禁止的操作
+- ❌ 跳过设计直接写代码
+- ❌ 修改模块职责边界
+- ❌ 引入未经批准的第三方依赖
+- ❌ 硬编码配置信息
+
+---
+
+**项目名称**: Wood-ARK  
+**最后更新**: 2025-11-13  
+**版本**: 1.0  
+**适用范围**: 仅限 Wood-ARK 项目
